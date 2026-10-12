@@ -7,7 +7,7 @@
 <script src="/static/app.js" defer></script>
 </head>
 <body>
-<header><a href="/">✦ ひらめきクイズ</a><span>小さな挑戦、大きな発見。</span></header>
+<header><a href="/">✦ ひらめきクイズ</a><a href="/admin">クイズ管理</a></header>
 <main>
 <div class="eyebrow">DAILY BRAIN BREAK</div>
 <h1>ひらめく準備は、できた？</h1>
@@ -17,9 +17,10 @@
 <span class="tag">4択クイズ · 一般知識</span>
 <h2>今日のチャレンジ</h2>
 <p>挑戦する問題数を選んでスタートしましょう。</p>
+<p id="availability" role="status">問題数を確認中…</p>
 <label for="count">問題数</label>
-<select id="count"><option value="1">1問</option><option value="2">2問</option><option value="3">3問</option><option value="4">4問</option><option value="5" selected>5問</option></select>
-<button id="start" class="primary">クイズをはじめる →</button>
+<select id="count" disabled></select>
+<button id="start" class="primary" disabled>クイズをはじめる →</button>
 <div class="hint">時間制限なし。自分のペースで楽しもう。</div>
 </div>
 <div id="quiz" hidden></div>
