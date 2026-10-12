@@ -3,15 +3,18 @@ const quiz = document.querySelector('#quiz');
 const result = document.querySelector('#result');
 const error = document.querySelector('#error');
 const content = document.querySelector('#content');
-let questions = [], answers = [], current = 0;
+let questions = [], answers = [], current = 0, sessionId = null;
 
-function showError() {
-  error.textContent = '通信に失敗しました。接続を確認して、もう一度お試しください。';
+function showError(message) {
+  error.textContent = message || '通信に失敗しました。接続を確認して、もう一度お試しください。';
   error.hidden = false;
 }
 async function request(url, options) {
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error('Request failed');
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(typeof data.detail === 'string' ? data.detail : '入力内容を確認してください。');
+  }
   return response.json();
 }
 function element(tag, text, className) {
@@ -19,6 +22,27 @@ function element(tag, text, className) {
   if (text !== undefined) node.textContent = text;
   if (className) node.className = className;
   return node;
+}
+async function refreshAvailability() {
+  const start = document.querySelector('#start');
+  const count = document.querySelector('#count');
+  start.disabled = true;
+  count.disabled = true;
+  try {
+    const data = await request('/api/status');
+    const previous = Number(count.value) || 5;
+    count.replaceChildren();
+    for (let number = 1; number <= data.available_questions; number += 1) {
+      const option = element('option', number + '問');
+      option.value = number;
+      count.append(option);
+    }
+    count.value = Math.min(previous, data.available_questions);
+    document.querySelector('#availability').textContent = data.available_questions
+      ? '登録問題：' + data.available_questions + '問'
+      : '問題が未登録です。管理画面から追加してください。';
+    count.disabled = start.disabled = !data.available_questions;
+  } catch (failure) { showError(failure.message); }
 }
 document.querySelector('#start').addEventListener('click', async (event) => {
   const button = event.currentTarget;
@@ -28,10 +52,11 @@ document.querySelector('#start').addEventListener('click', async (event) => {
   try {
     const data = await request('/api/questions?count=' + document.querySelector('#count').value);
     questions = data.questions;
+    sessionId = data.session_id;
     answers = []; current = 0;
     setup.hidden = true; result.hidden = true; quiz.hidden = false;
     renderQuestion();
-  } catch { showError(); }
+  } catch (failure) { showError(failure.message); }
   finally { button.disabled = false; content.setAttribute('aria-busy', 'false'); }
 });
 function renderQuestion() {
@@ -69,10 +94,10 @@ function renderQuestion() {
     try {
       const data = await request('/api/submit', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({answers: questions.map((item, index) => ({question_id: item.id, choice: answers[index]}))})
+        body: JSON.stringify({session_id: sessionId, answers: questions.map((item, index) => ({question_id: item.id, choice: answers[index]}))})
       });
       renderResult(data);
-    } catch { showError(); next.disabled = false; }
+    } catch (failure) { showError(failure.message); next.disabled = false; }
     finally { content.setAttribute('aria-busy', 'false'); }
   });
   quiz.append(progress, bar, title, choices, next);
@@ -97,7 +122,8 @@ function renderResult(data) {
   const retry = element('button', 'もう一度チャレンジ →', 'primary');
   retry.addEventListener('click', () => {
     result.hidden = true; setup.hidden = false; error.hidden = true;
-    document.querySelector('#start').focus();
+    refreshAvailability().then(() => document.querySelector('#start').focus());
   });
   result.append(retry); title.focus();
 }
+window.addEventListener('pageshow', () => { if (!setup.hidden) refreshAvailability(); });
